@@ -35,7 +35,7 @@ void MVKBuffer::propagateDebugName() {
 
 		_deviceMemory->setDebugName(_debugName.UTF8String);
 	}
-	setLabelIfNotNil(_mtlBuffer, _debugName);
+	setMetalObjectLabel(_mtlBuffer, _debugName);
 }
 
 
@@ -279,7 +279,7 @@ void MVKBuffer::detachMemory() {
 #pragma mark MVKBufferView
 
 void MVKBufferView::propagateDebugName() {
-	setLabelIfNotNil(_mtlTexture, _debugName);
+	setMetalObjectLabel(_mtlTexture, _debugName);
 }
 
 #pragma mark Metal
@@ -296,7 +296,7 @@ id<MTLTexture> MVKBufferView::getMTLTexture() {
         if ( mvkIsAnyFlagEnabled(_buffer->getUsage(), VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT) ) {
 			usage |= MTLTextureUsageShaderWrite;
 #if MVK_XCODE_15
-			if (getMetalFeatures().nativeTextureAtomics && (_mtlPixelFormat == MTLPixelFormatR32Sint || _mtlPixelFormat == MTLPixelFormatR32Uint || _mtlPixelFormat == MTLPixelFormatRG32Uint))
+			if (getMetalFeatures().nativeTextureAtomics && (_mtlPixelFormat == MTLPixelFormatR32Sint || _mtlPixelFormat == MTLPixelFormatR32Uint))
 				usage |= MTLTextureUsageShaderAtomic;
 #endif
         }

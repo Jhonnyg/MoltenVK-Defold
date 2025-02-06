@@ -107,6 +107,7 @@ MVK_EXTENSION(EXT_debug_marker,                       EXT_DEBUG_MARKER,         
 MVK_EXTENSION(EXT_debug_report,                       EXT_DEBUG_REPORT,                       INSTANCE, 10.11,  8.0,  1.0)
 MVK_EXTENSION(EXT_debug_utils,                        EXT_DEBUG_UTILS,                        INSTANCE, 10.11,  8.0,  1.0)
 MVK_EXTENSION(EXT_descriptor_indexing,                EXT_DESCRIPTOR_INDEXING,                DEVICE,   10.11,  8.0,  1.0)
+MVK_EXTENSION(EXT_depth_clip_control,                 EXT_DEPTH_CLIP_CONTROL,                 DEVICE,   10.11,  8.0,  1.0)
 MVK_EXTENSION(EXT_extended_dynamic_state,             EXT_EXTENDED_DYNAMIC_STATE,             DEVICE,   10.11,  8.0,  1.0)
 MVK_EXTENSION(EXT_extended_dynamic_state2,            EXT_EXTENDED_DYNAMIC_STATE_2,           DEVICE,   10.11,  8.0,  1.0)
 MVK_EXTENSION(EXT_extended_dynamic_state3,            EXT_EXTENDED_DYNAMIC_STATE_3,           DEVICE,   10.11,  8.0,  1.0)
@@ -156,8 +157,7 @@ MVK_EXTENSION(GOOGLE_display_timing,                  GOOGLE_DISPLAY_TIMING,    
 MVK_EXTENSION(MVK_ios_surface,                        MVK_IOS_SURFACE,                        INSTANCE, MVK_NA, 8.0, MVK_NA)
 MVK_EXTENSION(MVK_macos_surface,                      MVK_MACOS_SURFACE,                      INSTANCE, 10.11, MVK_NA, MVK_NA)
 MVK_EXTENSION(MVK_moltenvk,                           MVK_MOLTENVK,                           INSTANCE, 10.11,  8.0,  1.0)
-MVK_EXTENSION(NV_fragment_shader_barycentric,         NV_FRAGMENT_SHADER_BARYCENTRIC,         DEVICE,   10.15, 14.0,  1.0)
-MVK_EXTENSION_LAST(NV_glsl_shader,                    NV_GLSL_SHADER,                         DEVICE,   10.11,  8.0,  1.0)
+MVK_EXTENSION_LAST(NV_fragment_shader_barycentric,    NV_FRAGMENT_SHADER_BARYCENTRIC,         DEVICE,   10.15, 14.0,  1.0)
 
 #undef MVK_EXTENSION
 #undef MVK_EXTENSION_LAST

@@ -158,6 +158,9 @@ public:
 	/** Returns whether this binding should be applied to the shader stage. */
 	bool getApplyToStage(MVKShaderStage stage) { return _applyToStage[stage]; }
 
+	/** Returns a text description of this binding. */
+	std::string getLogDescription(std::string indent = "");
+
 	MVKDescriptorSetLayoutBinding(MVKDevice* device,
 								  MVKDescriptorSetLayout* layout,
 								  const VkDescriptorSetLayoutBinding* pBinding,
@@ -191,7 +194,6 @@ protected:
 	void encodeImmutableSamplersToMetalArgumentBuffer(MVKDescriptorSet* mvkDescSet);
 	uint8_t getMaxPlaneCount();
 	uint32_t getMTLResourceCount(uint32_t variableDescriptorCount = kMVKVariableDescriptorCountUnknown);
-	std::string getLogDescription();
 
 	MVKDescriptorSetLayout* _layout;
 	VkDescriptorSetLayoutBinding _info;
@@ -382,18 +384,33 @@ public:
 
 	void write(MVKDescriptorSetLayoutBinding* mvkDSLBind,
 			   MVKDescriptorSet* mvkDescSet,
-			   uint32_t dstOffset, 	// Inline buffers use this parameter as an offset, not an index
+			   uint32_t dstIdx,
 			   uint32_t srcIdx,
 			   size_t srcStride,
-			   const void* pData) override;
+			   const void* pData) override {}
 
 	void read(MVKDescriptorSetLayoutBinding* mvkDSLBind,
 			  MVKDescriptorSet* mvkDescSet,
-			  uint32_t srcOffset, // For inline buffers we are using this parameter as src offset not as dst descIdx
+			  uint32_t dstIndex,
 			  VkDescriptorImageInfo* pImageInfo,
 			  VkDescriptorBufferInfo* pBufferInfo,
 			  VkBufferView* pTexelBufferView,
-			  VkWriteDescriptorSetInlineUniformBlockEXT* inlineUniformBlock) override;
+			  VkWriteDescriptorSetInlineUniformBlockEXT* inlineUniformBlock) override {}
+
+	uint32_t writeBytes(MVKDescriptorSetLayoutBinding* mvkDSLBind,
+						MVKDescriptorSet* mvkDescSet,
+						uint32_t dstOffset,
+						uint32_t srcOffset,
+						uint32_t byteCount,
+						const VkWriteDescriptorSetInlineUniformBlockEXT* pInlineUniformBlock);
+
+	uint32_t readBytes(MVKDescriptorSetLayoutBinding* mvkDSLBind,
+					   MVKDescriptorSet* mvkDescSet,
+					   uint32_t dstOffset,
+					   uint32_t srcOffset,
+					   uint32_t byteCount,
+					   const VkWriteDescriptorSetInlineUniformBlockEXT* pInlineUniformBlock);
+
 
 	void encodeResourceUsage(MVKResourcesCommandEncoderState* rezEncState,
 							 MVKDescriptorSetLayoutBinding* mvkDSLBind,

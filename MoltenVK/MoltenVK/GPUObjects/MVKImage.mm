@@ -299,7 +299,7 @@ bool MVKImagePlane::overlaps(VkSubresourceLayout& imgLayout, VkDeviceSize offset
 }
 
 void MVKImagePlane::propagateDebugName() {
-    setLabelIfNotNil(_image->_planes[_planeIndex]->_mtlTexture, _image->_debugName);
+	_image->setMetalObjectLabel(_image->_planes[_planeIndex]->_mtlTexture, _image->_debugName);
 }
 
 MVKImageMemoryBinding* MVKImagePlane::getMemoryBinding() const {
@@ -412,8 +412,10 @@ VkResult MVKImageMemoryBinding::bindDeviceMemory(MVKDeviceMemory* mvkMem, VkDevi
     if (_deviceMemory) { _deviceMemory->removeImageMemoryBinding(this); }
     MVKResource::bindDeviceMemory(mvkMem, memOffset);
 
+    if (!_deviceMemory) { return VK_SUCCESS; }
+
 	auto& mtlFeats = getMetalFeatures();
-    bool usesTexelBuffer = mtlFeats.texelBuffers && _deviceMemory; // Texel buffers available
+    bool usesTexelBuffer = mtlFeats.texelBuffers; // Texel buffers available
     usesTexelBuffer = usesTexelBuffer && (isMemoryHostAccessible() || mtlFeats.placementHeaps) && _image->_isLinear && !_image->getIsCompressed(); // Applicable memory layout
 
     // macOS before 10.15.5 cannot use shared memory for texel buffers.
@@ -425,7 +427,8 @@ VkResult MVKImageMemoryBinding::bindDeviceMemory(MVKDeviceMemory* mvkMem, VkDevi
             _mtlTexelBufferOffset = getDeviceMemoryOffset();
         } else {
             // Create our own buffer for this.
-            if (_deviceMemory && _deviceMemory->_mtlHeap && _image->getMTLStorageMode() == _deviceMemory->_mtlStorageMode) {
+            if (_ownsTexelBuffer) { [_mtlTexelBuffer release]; }
+            if (_deviceMemory->_mtlHeap && _image->getMTLStorageMode() == _deviceMemory->_mtlStorageMode) {
                 _mtlTexelBuffer = [_deviceMemory->_mtlHeap newBufferWithLength: _byteCount options: _deviceMemory->getMTLResourceOptions() offset: getDeviceMemoryOffset()];
                 if (_image->_isAliasable) { [_mtlTexelBuffer makeAliasable]; }
             } else {
@@ -443,7 +446,7 @@ VkResult MVKImageMemoryBinding::bindDeviceMemory(MVKDeviceMemory* mvkMem, VkDevi
     }
 
     flushToDevice(getDeviceMemoryOffset(), getByteCount());
-    return _deviceMemory ? _deviceMemory->addImageMemoryBinding(this) : VK_SUCCESS;
+    return _deviceMemory->addImageMemoryBinding(this);
 }
 
 void MVKImageMemoryBinding::applyMemoryBarrier(MVKPipelineBarrier& barrier,
@@ -463,7 +466,7 @@ void MVKImageMemoryBinding::propagateDebugName() {
         _image->_planes[planeIndex]->propagateDebugName();
     }
     if (_ownsTexelBuffer) {
-        setLabelIfNotNil(_mtlTexelBuffer, _image->_debugName);
+        setMetalObjectLabel(_mtlTexelBuffer, _image->_debugName);
     }
 }
 
@@ -1634,6 +1637,7 @@ void MVKPresentableSwapchainImage::addPresentedHandler(id<CAMetalDrawable> mtlDr
 void MVKPresentableSwapchainImage::beginPresentation(const MVKImagePresentInfo& presentInfo) {
 	retain();
 	_swapchain->beginPresentation(presentInfo);
+	_beginPresentTime = mvkGetRuntimeNanoseconds();
 	_presentationStartTime = getPerformanceTimestamp();
 }
 
@@ -1652,7 +1656,7 @@ void MVKPresentableSwapchainImage::endPresentation(const MVKImagePresentInfo& pr
 		// VkDevice, have been destroyed by the time of this callback, so do not reference them.
 		lock_guard<mutex> lock(_detachmentLock);
 		if (_device) { addPerformanceInterval(getPerformanceStats().queue.presentSwapchains, _presentationStartTime); }
-		if (_swapchain) { _swapchain->endPresentation(presentInfo, actualPresentTime); }
+		if (_swapchain) { _swapchain->endPresentation(presentInfo, _beginPresentTime, actualPresentTime); }
 	}
 
 	// Makes an image available for acquisition by the app.
@@ -1767,7 +1771,7 @@ MVKPeerSwapchainImage::MVKPeerSwapchainImage(MVKDevice* device,
 
 MVKVulkanAPIObject* MVKImageViewPlane::getVulkanAPIObject() { return _imageView; }
 
-void MVKImageViewPlane::propagateDebugName() { setLabelIfNotNil(_mtlTexture, _imageView->_debugName); }
+void MVKImageViewPlane::propagateDebugName() { _imageView->setMetalObjectLabel(_mtlTexture, _imageView->_debugName); }
 
 
 #pragma mark Metal
@@ -1911,6 +1915,11 @@ VkResult MVKImageViewPlane::initSwizzledMTLPixelFormat(const VkImageViewCreateIn
 			break;
 
 		case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
+		case VK_FORMAT_B5G6R5_UNORM_PACK16:
+		case VK_FORMAT_B5G5R5A1_UNORM_PACK16:
+		case VK_FORMAT_B8G8R8A8_SNORM:
+		case VK_FORMAT_B8G8R8A8_UINT:
+		case VK_FORMAT_B8G8R8A8_SINT:
 			// Metal doesn't support this directly, so use a swizzle to get the ordering right.
 			adjustAnyComponentSwizzleValue(r, B, B, G, R, A);
 			adjustAnyComponentSwizzleValue(g, G, B, G, R, A);
@@ -2193,6 +2202,8 @@ void MVKImageView::populateMTLRenderPassAttachmentDescriptorResolve(MTLRenderPas
 
 MVKImageView::MVKImageView(MVKDevice* device, const VkImageViewCreateInfo* pCreateInfo) : MVKVulkanAPIDeviceObject(device) {
 	_image = (MVKImage*)pCreateInfo->image;
+	_image->retain();		// Ensure image sticks around while this image view is in flight.
+
     _mtlTextureType = mvkMTLTextureTypeFromVkImageViewType(pCreateInfo->viewType,
 														   _image->getSampleCount() != VK_SAMPLE_COUNT_1_BIT);
 
@@ -2305,6 +2316,7 @@ MVKImageView::MVKImageView(MVKDevice* device, const VkImageViewCreateInfo* pCrea
 // Memory detached in destructor too, as a fail-safe.
 MVKImageView::~MVKImageView() {
 	detachMemory();
+	_image->release();
 }
 
 // Overridden to detach from the resource memory when the app destroys this object.
@@ -2473,7 +2485,6 @@ MTLSamplerDescriptor* MVKSampler::newMTLSamplerDescriptor(const VkSamplerCreateI
 
 MVKSampler::MVKSampler(MVKDevice* device, const VkSamplerCreateInfo* pCreateInfo) : MVKVulkanAPIDeviceObject(device) {
     _ycbcrConversion = NULL;
-	const VkSamplerReductionModeCreateInfo* pSampReductInfo = nullptr;
     for (const auto* next = (const VkBaseInStructure*)pCreateInfo->pNext; next; next = next->pNext) {
 		switch (next->sType) {
 			case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO_KHR: {
@@ -2482,7 +2493,6 @@ MVKSampler::MVKSampler(MVKDevice* device, const VkSamplerCreateInfo* pCreateInfo
 				break;
 			}
 			case VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO: {
-				pSampReductInfo = (const VkSamplerReductionModeCreateInfo*)next;
 				break;
 			}
 			default:

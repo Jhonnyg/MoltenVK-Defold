@@ -93,6 +93,37 @@ static constexpr VkExtent2D kMVKSampleLocationPixelGridSizeNotSupported = { 0, 0
 typedef NSUInteger MTLTimestamp;
 #endif
 
+
+#pragma mark -
+#pragma mark MVKMTLDeviceCapabilities
+
+typedef struct MVKMTLDeviceCapabilities {
+	bool supportsApple1;
+	bool supportsApple2;
+	bool supportsApple3;
+	bool supportsApple4;
+	bool supportsApple5;
+	bool supportsApple6;
+	bool supportsApple7;
+	bool supportsApple8;
+	bool supportsApple9;
+	bool supportsMac1;
+	bool supportsMac2;
+	bool supportsMetal3;
+
+	bool isAppleGPU;
+	bool supportsBCTextureCompression;
+	bool supportsDepth24Stencil8;
+	bool supports32BitFloatFiltering;
+	bool supports32BitMSAA;
+
+	uint8_t getHighestAppleGPU() const;
+	uint8_t getHighestMacGPU() const;
+
+	MVKMTLDeviceCapabilities(id<MTLDevice> mtlDev);
+} MVKMTLDeviceCapabilities;
+
+
 #pragma mark -
 #pragma mark MVKPhysicalDevice
 
@@ -337,7 +368,10 @@ public:
 	/** Returns the external memory properties supported for images for the handle type. */
 	VkExternalMemoryProperties& getExternalImageProperties(VkExternalMemoryHandleTypeFlagBits handleType);
 
-	
+	/** Returns the amount of memory currently consumed by the GPU. */
+	size_t getCurrentAllocatedSize();
+
+
 #pragma mark Metal
 
 	/** Populates the specified structure with the Metal-specific features of this device. */
@@ -354,6 +388,9 @@ public:
 
 	/** Returns the MTLStorageMode that matches the Vulkan memory property flags. */
 	MTLStorageMode getMTLStorageModeFromVkMemoryPropertyFlags(VkMemoryPropertyFlags vkFlags);
+
+	/** Returns the MTLDevice capabilities. */
+	const MVKMTLDeviceCapabilities getMTLDeviceCapabilities() { return _gpuCapabilities; }
 
 
 #pragma mark Construction
@@ -396,7 +433,6 @@ protected:
 	void setMemoryType(uint32_t typeIndex, uint32_t heapIndex, VkMemoryPropertyFlags propertyFlags);
 	uint64_t getVRAMSize();
 	uint64_t getRecommendedMaxWorkingSetSize();
-	uint64_t getCurrentAllocatedSize();
 	uint32_t getMaxSamplerCount();
 	uint32_t getMaxPerSetDescriptorCount();
 	void initExternalMemoryProperties();
@@ -413,9 +449,11 @@ protected:
 	void populateHostImageCopyProperties(VkPhysicalDeviceHostImageCopyPropertiesEXT* pHostImageCopyProps);
 	void logGPUInfo();
 
-	id<MTLDevice> _mtlDevice;
 	MVKInstance* _mvkInstance;
+	id<MTLDevice> _mtlDevice;
+	const MVKMTLDeviceCapabilities _gpuCapabilities;
 	const MVKExtensionList _supportedExtensions;
+	MVKPixelFormats _pixelFormats;
 	VkPhysicalDeviceFeatures _features;
 	MVKPhysicalDeviceVulkan12FeaturesNoExt _vulkan12FeaturesNoExt;
 	MVKPhysicalDeviceMetalFeatures _metalFeatures;
@@ -423,7 +461,6 @@ protected:
 	VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT _texelBuffAlignProperties;
 	VkPhysicalDeviceMemoryProperties _memoryProperties;
 	MVKSmallVector<MVKQueueFamily*, kMVKQueueFamilyCount> _queueFamilies;
-	MVKPixelFormats _pixelFormats;
 	VkExternalMemoryProperties _hostPointerExternalMemoryProperties;
 	VkExternalMemoryProperties _mtlBufferExternalMemoryProperties;
 	VkExternalMemoryProperties _mtlTextureExternalMemoryProperties;
@@ -437,8 +474,7 @@ protected:
 	uint32_t _privateMemoryTypes;
 	uint32_t _lazilyAllocatedMemoryTypes;
 	bool _hasUnifiedMemory = true;
-	bool _isAppleGPU = true;
-	bool _isUsingMetalArgumentBuffers = false;
+	bool _isUsingMetalArgumentBuffers = true;
 };
 
 
@@ -896,7 +932,7 @@ public:
 	bool isUnifiedMemoryGPU() { return _device->_physicalDevice->_hasUnifiedMemory; }
 
 	/** Returns whether the GPU is Apple Silicon. */
-	bool isAppleGPU() { return _device->_physicalDevice->_isAppleGPU; }
+	bool isAppleGPU() { return _device->_physicalDevice->_gpuCapabilities.isAppleGPU; }
 
 	/** Returns whether this device is using one Metal argument buffer for each descriptor set, on multiple pipeline and pipeline stages. */
 	virtual bool isUsingMetalArgumentBuffers() { return _device->_physicalDevice->_isUsingMetalArgumentBuffers; };
@@ -1068,16 +1104,3 @@ uint64_t mvkGetRegistryID(id<MTLDevice> mtlDevice);
  * the returned value will be zero.
  */
 uint64_t mvkGetLocationID(id<MTLDevice> mtlDevice);
-
-/** Returns whether the MTLDevice supports BC texture compression. */
-bool mvkSupportsBCTextureCompression(id<MTLDevice> mtlDevice);
-
-/** Redefinitions because Mac Catalyst doesn't support feature sets. */
-#if MVK_MACCAT
-#define MTLFeatureSet_macOS_GPUFamily1_v1		MTLGPUFamilyMacCatalyst1
-#define MTLFeatureSet_macOS_GPUFamily1_v2		MTLGPUFamilyMacCatalyst1
-#define MTLFeatureSet_macOS_GPUFamily1_v3		MTLGPUFamilyMacCatalyst1
-#define MTLFeatureSet_macOS_GPUFamily1_v4		MTLGPUFamilyMacCatalyst1
-
-#define MTLFeatureSet_macOS_GPUFamily2_v1		MTLGPUFamilyMacCatalyst2
-#endif
